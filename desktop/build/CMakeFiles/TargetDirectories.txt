@@ -1,0 +1,5 @@
+/home/k/ProGaming/rsvp/desktop/build/CMakeFiles/RSVPReader.dir
+/home/k/ProGaming/rsvp/desktop/build/CMakeFiles/edit_cache.dir
+/home/k/ProGaming/rsvp/desktop/build/CMakeFiles/rebuild_cache.dir
+/home/k/ProGaming/rsvp/desktop/build/CMakeFiles/RSVPReader_autogen_timestamp_deps.dir
+/home/k/ProGaming/rsvp/desktop/build/CMakeFiles/RSVPReader_autogen.dir

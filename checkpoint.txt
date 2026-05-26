@@ -1,0 +1,199 @@
+================================================================================
+RSVP READER — BUILD-OUT CHECKPOINT
+================================================================================
+Date: 2026-05-25T21:40 IST
+Agent: GitHub Copilot (GPT-5.2-Codex)
+Reason for stop: All remaining platform files created; checkpoint refreshed.
+
+================================================================================
+PROJECT OVERVIEW
+================================================================================
+
+Cross-platform RSVP (Rapid Serial Visual Presentation) speed-reading app.
+- Android: Jetpack Compose + Kotlin, C++ engine via JNI
+- iOS: SwiftUI + Swift, C++ engine via C bridge (Swift C++ interop)
+- Desktop: Qt 6 Widgets + C++
+
+The C++ engine in core/rsvp_engine.hpp is the SINGLE SOURCE OF TRUTH for all
+reading logic. Never re-implement tokenisation, ORP, or timing in platform code.
+
+Full design spec is in AGENTS.md (read this first).
+
+================================================================================
+WHAT WAS COMPLETED
+================================================================================
+
+PHASE 1: DIRECTORY RESTRUCTURING ✅ DONE
+─────────────────────────────────────────
+All files moved from flat root into canonical layout:
+
+  rsvp_engine.hpp      → core/rsvp_engine.hpp
+  CMakeLists.txt       → core/CMakeLists.txt
+  android_bridge.cpp   → android/app/src/main/cpp/android_bridge.cpp
+  CMakeLists(1).txt    → android/app/src/main/cpp/CMakeLists.txt
+  RSVPEngine.kt        → android/app/src/main/kotlin/com/yourapp/rsvp/RSVPEngine.kt
+
+PHASE 2: CORE C BRIDGE ✅ DONE
+────────────────────────────────
+Created C-compatible wrapper around rsvp::Engine for Swift interop.
+Swift 5.9+ C++ interop does NOT support std::function, so this extern "C"
+shim exposes the engine via C function pointers with void* context.
+
+  core/rsvp_bridge.h   (114 lines) — C API declarations
+  core/rsvp_bridge.cpp (159 lines) — Implementation wrapping rsvp::Engine
+
+The bridge exposes:
+  - rsvp_create() / rsvp_destroy()
+  - rsvp_load(), rsvp_play(), rsvp_pause(), rsvp_toggle(), rsvp_seek()
+  - rsvp_set_wpm(), rsvp_get_wpm(), rsvp_progress(), rsvp_cur(), rsvp_total()
+  - rsvp_set_on_token(), rsvp_set_on_state(), rsvp_set_on_done()
+
+PHASE 3: ANDROID — DONE
+─────────────────────────────────────────────────────
+Files created by subagent before crash:
+
+  ✅ android/build.gradle.kts          (5 lines)  — Root gradle: AGP 9.2.0, Kotlin 2.3.21
+  ✅ android/settings.gradle.kts       (21 lines) — Plugin management, include :app
+  ✅ android/app/src/main/AndroidManifest.xml (23 lines) — Single ReaderActivity
+  ✅ android/app/src/main/res/values/strings.xml (4 lines) — App name
+  ✅ android/app/src/main/cpp/CMakeLists.txt (14 lines) — Already moved, include path OK
+  ✅ android/app/src/main/cpp/android_bridge.cpp (104 lines) — Already moved, works
+  ✅ android/app/src/main/kotlin/.../RSVPEngine.kt (72 lines) — Already moved, works
+
+  ✅ android/app/build.gradle.kts — Module-level Gradle config
+  ✅ android/app/src/main/kotlin/.../ReaderActivity.kt — Compose UI
+
+PHASE 4: iOS — DONE
+─────────────────────────────────────────────────
+Files created by subagent before crash:
+
+  ✅ ios/RSVPReader/Package.swift (27 lines) — SPM config, cxx17, interop mode
+  ✅ ios/RSVPReader/Sources/RSVPEngineCxx/dummy.cpp (2 lines) — SPM requirement
+  ✅ ios/RSVPReader/Sources/RSVPEngineCxx/include/rsvp_engine.hpp (255 lines) — Copy of engine
+  ✅ ios/RSVPReader/Sources/RSVPEngineCxx/include/rsvp_bridge.h (55 lines) — Copy of bridge header
+  ✅ ios/RSVPReader/Sources/RSVPEngineCxx/rsvp_bridge.cpp (128 lines) — Copy of bridge impl
+
+  ✅ ios/RSVPReader/Sources/RSVPReader/RSVPEngine.swift — Swift wrapper
+  ✅ ios/RSVPReader/Sources/RSVPReader/ReaderView.swift — SwiftUI views
+  ✅ ios/RSVPReader/Sources/RSVPReader/RSVPReaderApp.swift — @main entry
+
+PHASE 5: DESKTOP — DONE
+──────────────────────────────────
+  ✅ desktop/CMakeLists.txt (19 lines) — Qt6 cmake config
+  ✅ desktop/main.cpp — Qt Widgets app
+
+================================================================================
+WHAT STILL NEEDS TO BE CREATED
+================================================================================
+
+None. All platform files are now in place.
+
+================================================================================
+DESIGN SPEC REFERENCE (from AGENTS.md)
+================================================================================
+
+Colors:
+  Background:     #0a0a0a
+  Word text:      #e8e4dc, serif font (EB Garamond or system serif)
+  ORP letter:     #c0392b
+  Guide lines:    rgba(255,255,255,0.06)
+  WPM badge:      monospace, rgba(255,255,255,0.22)
+
+Touch gestures (Android + iOS):
+  Tap           → play / pause
+  Swipe left    → skip +8 words
+  Swipe right   → skip −8 words
+  Swipe up      → speed +25 WPM
+  Swipe down    → speed −25 WPM
+  Long press    → back to text input (600ms)
+
+Keyboard (Desktop):
+  Space         → play / pause
+  Left/Right    → seek ±8 words
+  Up/Down       → speed ±25 WPM
+  Escape        → back to text input
+
+Hard rules:
+  1. core/rsvp_engine.hpp is header-only, zero external deps
+  2. on_token fires on timer thread — MUST dispatch to UI thread
+  3. C++17 only, no C++20
+  4. No shared state between platforms
+  5. UI code never touches timing math
+
+================================================================================
+C BRIDGE API REFERENCE (for iOS Swift files)
+================================================================================
+
+The C bridge (core/rsvp_bridge.h) exposes these functions:
+
+  // Callback types
+  typedef void (*rsvp_token_cb)(void* ctx, const char* before, const char* orp,
+      const char* after, const char* punct, uint32_t idx, uint32_t total,
+      uint32_t dur_ms, int sentence_end);
+  typedef void (*rsvp_state_cb)(void* ctx, int state);  // 0=Idle,1=Playing,2=Paused,3=Done
+  typedef void (*rsvp_done_cb)(void* ctx);
+
+  // Lifecycle
+  void* rsvp_create(void);
+  void  rsvp_destroy(void* engine);
+
+  // Playback
+  void  rsvp_load(void* engine, const char* text, int wpm);
+  void  rsvp_play(void* engine);
+  void  rsvp_pause(void* engine);
+  void  rsvp_toggle(void* engine);
+  void  rsvp_seek(void* engine, int delta);
+
+  // Speed / Progress
+  void     rsvp_set_wpm(void* engine, int wpm);
+  int      rsvp_get_wpm(void* engine);
+  float    rsvp_progress(void* engine);
+  uint32_t rsvp_cur(void* engine);
+  uint32_t rsvp_total(void* engine);
+
+  // Callbacks
+  void rsvp_set_on_token(void* engine, rsvp_token_cb cb, void* ctx);
+  void rsvp_set_on_state(void* engine, rsvp_state_cb cb, void* ctx);
+  void rsvp_set_on_done(void* engine, rsvp_done_cb cb, void* ctx);
+
+================================================================================
+ENGINE API REFERENCE (for Android/Desktop)
+================================================================================
+
+  rsvp::Engine engine;
+
+  engine.on_token = [](const rsvp::Token& t, size_t idx, size_t total) { ... };
+  engine.on_state = [](rsvp::State s) { ... };
+  engine.on_done  = []() { ... };
+
+  engine.load(text, wpm);    // tokenise + set speed
+  engine.play();
+  engine.pause();
+  engine.toggle();
+  engine.seek(delta);        // +n forward, -n backward
+  engine.set_wpm(wpm);       // live speed change
+  engine.wpm();              // get current WPM
+  engine.progress();         // 0.0–1.0
+  engine.cur();              // current word index
+  engine.total();            // total word count
+  engine.state();            // State::Idle/Playing/Paused/Done
+
+  rsvp::Token has: before, orp, after, punct (strings), dur_ms, sentence_end
+
+================================================================================
+VERIFICATION (after all files are created)
+================================================================================
+
+1. Compile C++ bridge:
+   g++ -std=c++17 -c core/rsvp_bridge.cpp -I core/ -o /dev/null
+
+2. Desktop build (if Qt 6 installed):
+   cd desktop && cmake -B build && cmake --build build
+
+3. Android: open android/ in Android Studio, ./gradlew assembleDebug
+
+4. iOS: open ios/RSVPReader/ in Xcode, build for simulator
+
+================================================================================
+END OF CHECKPOINT
+================================================================================

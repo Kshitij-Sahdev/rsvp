@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSVP Reader — Interactive Demo</title>
+    <meta name="description" content="Interactive demo of the RSVP speed-reading engine">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #0a0a0a;
+            --word: #e8e4dc;
+            --orp: #c0392b;
+            --guide: rgba(255,255,255,0.06);
+            --badge: rgba(255,255,255,0.22);
+            --punct: rgba(255,255,255,0.40);
+            --input-bg: #111111;
+            --serif: 'EB Garamond', Georgia, 'Times New Roman', serif;
+            --mono: 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--word);
+            font-family: var(--serif);
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* ── INPUT SCREEN ───────────────────────────────── */
+        #input-screen {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            padding: 32px;
+            gap: 20px;
+            animation: fadeIn 0.4s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        #input-screen h1 {
+            font-family: var(--serif);
+            font-size: 2.4rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            background: linear-gradient(135deg, var(--word) 40%, var(--orp) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .input-hint {
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--badge);
+            letter-spacing: 0.03em;
+        }
+
+        #text-input {
+            flex: 1;
+            background: var(--input-bg);
+            color: var(--word);
+            font-family: var(--serif);
+            font-size: 1.05rem;
+            line-height: 1.7;
+            border: 1px solid rgba(255,255,255,0.06);
+            padding: 20px;
+            resize: none;
+            caret-color: var(--orp);
+            transition: border-color 0.3s ease;
+        }
+        #text-input:focus {
+            outline: none;
+            border-color: rgba(192,57,43,0.4);
+        }
+        #text-input::placeholder {
+            color: rgba(255,255,255,0.15);
+        }
+
+        .controls-row {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        #start-btn {
+            background: var(--orp);
+            color: var(--word);
+            border: none;
+            font-family: var(--mono);
+            font-size: 0.95rem;
+            font-weight: 500;
+            padding: 12px 36px;
+            cursor: pointer;
+            letter-spacing: 0.1em;
+            transition: all 0.2s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        #start-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0);
+            transition: background 0.2s ease;
+        }
+        #start-btn:hover::after {
+            background: rgba(255,255,255,0.08);
+        }
+        #start-btn:active { transform: scale(0.97); }
+
+        .wpm-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            color: var(--badge);
+        }
+        .wpm-control label { white-space: nowrap; }
+        #wpm-slider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 140px;
+            height: 3px;
+            background: rgba(255,255,255,0.1);
+            outline: none;
+        }
+        #wpm-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--orp);
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        #wpm-val {
+            min-width: 3.5em;
+            text-align: right;
+            color: var(--word);
+        }
+
+        .gesture-help {
+            font-family: var(--mono);
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.12);
+            line-height: 1.6;
+        }
+
+        /* ── READER SCREEN ──────────────────────────────── */
+        #reader-screen {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: var(--bg);
+            animation: fadeIn 0.3s ease;
+        }
+
+        /* crosshair */
+        .crosshair-v, .crosshair-h {
+            position: absolute;
+            background: var(--guide);
+        }
+        .crosshair-v {
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            transform: translateX(-0.5px);
+        }
+        .crosshair-h {
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            transform: translateY(-0.5px);
+        }
+
+        /* word display */
+        #word-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            font-family: var(--serif);
+            font-size: clamp(2.2rem, 6vw, 3.6rem);
+            line-height: 1;
+            pointer-events: none;
+            transition: opacity 0.06s ease;
+        }
+        #word-display .before { color: var(--word); }
+        #word-display .orp { color: var(--orp); font-weight: 700; }
+        #word-display .after { color: var(--word); }
+        #word-display .punct { color: var(--punct); }
+
+        /* orp tick marks */
+        .orp-tick-top, .orp-tick-bottom {
+            position: absolute;
+            left: 50%;
+            width: 1px;
+            height: 14px;
+            background: rgba(192,57,43,0.35);
+            transform: translateX(-0.5px);
+        }
+        .orp-tick-top { bottom: calc(50% + 28px); }
+        .orp-tick-bottom { top: calc(50% + 28px); }
+
+        /* badges */
+        .reader-badge {
+            position: absolute;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--badge);
+            pointer-events: none;
+        }
+        #wpm-badge { bottom: 20px; right: 24px; }
+        #progress-badge { bottom: 20px; left: 24px; }
+        #state-badge {
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        #state-badge.visible { opacity: 1; }
+
+        /* progress bar */
+        #progress-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            height: 2px;
+            background: var(--orp);
+            transition: width 0.15s ease;
+        }
+
+        /* gesture hint overlay */
+        #gesture-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: var(--mono);
+            font-size: 1.1rem;
+            color: rgba(192,57,43,0.7);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        #gesture-hint.show { opacity: 1; }
+
+        /* back button */
+        #back-btn {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            background: none;
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--badge);
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            padding: 6px 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            z-index: 10;
+        }
+        #back-btn:hover {
+            border-color: rgba(192,57,43,0.4);
+            color: var(--word);
+        }
+
+        /* platform tabs */
+        .platform-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 4px;
+        }
+        .platform-tab {
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            padding: 6px 16px;
+            color: var(--badge);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+            letter-spacing: 0.08em;
+        }
+        .platform-tab:hover { color: var(--word); }
+        .platform-tab.active {
+            color: var(--orp);
+            border-bottom-color: var(--orp);
+        }
+    </style>
+</head>
+<body>
+    <!-- INPUT SCREEN -->
+    <div id="input-screen">
+        <h1>RSVP Reader</h1>
+        <div class="platform-tabs">
+            <div class="platform-tab active" data-p="web">WEB DEMO</div>
+            <div class="platform-tab" data-p="android">ANDROID</div>
+            <div class="platform-tab" data-p="ios">iOS</div>
+            <div class="platform-tab" data-p="desktop">DESKTOP</div>
+        </div>
+        <p class="input-hint">Paste or type your text, then tap START</p>
+        <textarea id="text-input" placeholder="Paste your text here...">Speed reading is the process of rapidly recognizing and absorbing phrases or sentences on a page all at once, rather than identifying individual words. The amount of information that we process seems to be growing by the day, whether it is emails, reports and websites at work, or social media, books and magazines at home. We likely feel that we could not possibly cope with this information, let alone needing to recall and respond to it. Speed reading is not just about reading fast. The most important thing is understanding the text at higher speeds. RSVP, or Rapid Serial Visual Presentation, is a technique that flashes words one at a time at a fixed point on the screen. By eliminating the need for eye movement across lines, RSVP can dramatically increase your reading speed. The red letter you see is called the Optimal Recognition Point, where your eye naturally focuses on each word.</textarea>
+        <div class="controls-row">
+            <button id="start-btn">▶ START</button>
+            <div class="wpm-control">
+                <label>WPM</label>
+                <input type="range" id="wpm-slider" min="60" max="1200" value="300" step="25">
+                <span id="wpm-val">300</span>
+            </div>
+        </div>
+        <div class="gesture-help">
+            CONTROLS — Click: play/pause · ←→ keys: skip ±8 words · ↑↓ keys: speed ±25 WPM · Esc: back
+        </div>
+    </div>
+
+    <!-- READER SCREEN -->
+    <div id="reader-screen">
+        <div class="crosshair-v"></div>
+        <div class="crosshair-h"></div>
+        <div class="orp-tick-top"></div>
+        <div class="orp-tick-bottom"></div>
+
+        <div id="word-display">
+            <span class="before"></span><span class="orp"></span><span class="after"></span><span class="punct"></span>
+        </div>
+
+        <button id="back-btn">← ESC</button>
+        <div id="wpm-badge" class="reader-badge">300 WPM</div>
+        <div id="progress-badge" class="reader-badge">0/0</div>
+        <div id="state-badge" class="reader-badge">PAUSED</div>
+        <div id="progress-bar"></div>
+        <div id="gesture-hint"></div>
+    </div>
+
+    <script>
+    // ── RSVP Engine (faithful JS port of core/rsvp_engine.hpp) ──────────────
+    const Engine = (() => {
+        function orpIndex(word) {
+            let len = 0, first = -1;
+            for (let i = 0; i < word.length; i++) {
+                if (/[a-zA-Z]/.test(word[i])) {
+                    if (first < 0) first = i;
+                    len++;
+                }
+            }
+            if (len === 0 || first < 0) return 0;
+            const pos = len <= 1 ? 0 : len <= 5 ? 1 : len <= 9 ? 2 : len <= 13 ? 3 : 4;
+            let count = 0;
+            for (let i = first; i < word.length; i++) {
+                if (/[a-zA-Z]/.test(word[i])) {
+                    if (count === pos) return i;
+                    count++;
+                }
+            }
+            return first;
+        }
+
+        function wordDur(word, wpm, sentEnd) {
+            const base = 60000 / wpm;
+            let scale = 1;
+            if (word.length > 8) scale = 1.15;
+            if (word.length > 13) scale = 1.30;
+            for (let i = 1; i < word.length; i++) {
+                if (/\d/.test(word[i])) { scale *= 1.20; break; }
+                if (/[A-Z]/.test(word[i])) { scale *= 1.10; break; }
+            }
+            if (sentEnd) scale *= 1.60;
+            return Math.max(50, Math.min(2000, Math.round(base * scale)));
+        }
+
+        function tokenise(text, wpm) {
+            const tokens = [];
+            const words = text.match(/\S+/g) || [];
+            for (const raw of words) {
+                let end = raw.length;
+                while (end > 0 && /[^\w]/.test(raw[end - 1])) end--;
+                let clean = raw.substring(0, end);
+                let trail = raw.substring(end);
+                if (!clean) clean = raw;
+
+                const sentEnd = trail && /[.!?;]/.test(trail[trail.length - 1]);
+                const oi = orpIndex(clean);
+
+                tokens.push({
+                    before: clean.substring(0, oi),
+                    orp: clean.substring(oi, oi + 1),
+                    after: oi + 1 < clean.length ? clean.substring(oi + 1) : '',
+                    punct: trail,
+                    dur_ms: wordDur(clean, wpm, sentEnd),
+                    sentence_end: sentEnd
+                });
+            }
+            return tokens;
+        }
+
+        return class Engine {
+            constructor() {
+                this.tokens = [];
+                this.cur = 0;
+                this.wpm = 300;
+                this.state = 'idle'; // idle, playing, paused, done
+                this.timer = null;
+                this.onToken = null;
+                this.onState = null;
+                this.onDone = null;
+            }
+
+            load(text, wpm = 300) {
+                this.stop();
+                this.wpm = wpm;
+                this.tokens = tokenise(text, wpm);
+                this.cur = 0;
+                this.state = 'idle';
+            }
+
+            play() {
+                if (!this.tokens.length) return;
+                if (this.state === 'playing') return;
+                if (this.state === 'done') this.cur = 0;
+                this.state = 'playing';
+                if (this.onState) this.onState('playing');
+                this._tick();
+            }
+
+            pause() {
+                if (this.state !== 'playing') return;
+                this.state = 'paused';
+                clearTimeout(this.timer);
+                if (this.onState) this.onState('paused');
+            }
+
+            toggle() {
+                this.state === 'playing' ? this.pause() : this.play();
+            }
+
+            stop() {
+                clearTimeout(this.timer);
+                this.state = 'idle';
+            }
+
+            seek(delta) {
+                this.cur = Math.max(0, Math.min(this.tokens.length - 1, this.cur + delta));
+                if (this.state !== 'playing' && this.tokens.length) {
+                    const t = this.tokens[this.cur];
+                    if (this.onToken) this.onToken(t, this.cur, this.tokens.length);
+                }
+            }
+
+            setWpm(wpm) {
+                this.wpm = Math.max(60, Math.min(1200, wpm));
+                for (let i = this.cur; i < this.tokens.length; i++) {
+                    const t = this.tokens[i];
+                    const word = t.before + t.orp + t.after;
+                    t.dur_ms = wordDur(word, this.wpm, t.sentence_end);
+                }
+            }
+
+            progress() {
+                return this.tokens.length ? this.cur / this.tokens.length : 0;
+            }
+
+            _tick() {
+                if (this.state !== 'playing') return;
+                if (this.cur >= this.tokens.length) {
+                    this.state = 'done';
+                    if (this.onState) this.onState('done');
+                    if (this.onDone) this.onDone();
+                    return;
+                }
+                const t = this.tokens[this.cur];
+                if (this.onToken) this.onToken(t, this.cur, this.tokens.length);
+                this.timer = setTimeout(() => {
+                    this.cur++;
+                    this._tick();
+                }, t.dur_ms);
+            }
+        };
+    })();
+
+    // ── DOM refs ────────────────────────────────────────────────────────────
+    const inputScreen = document.getElementById('input-screen');
+    const readerScreen = document.getElementById('reader-screen');
+    const textInput = document.getElementById('text-input');
+    const startBtn = document.getElementById('start-btn');
+    const wpmSlider = document.getElementById('wpm-slider');
+    const wpmVal = document.getElementById('wpm-val');
+    const wordDisplay = document.getElementById('word-display');
+    const wpmBadge = document.getElementById('wpm-badge');
+    const progressBadge = document.getElementById('progress-badge');
+    const stateBadge = document.getElementById('state-badge');
+    const progressBar = document.getElementById('progress-bar');
+    const gestureHint = document.getElementById('gesture-hint');
+    const backBtn = document.getElementById('back-btn');
+
+    const beforeSpan = wordDisplay.querySelector('.before');
+    const orpSpan = wordDisplay.querySelector('.orp');
+    const afterSpan = wordDisplay.querySelector('.after');
+    const punctSpan = wordDisplay.querySelector('.punct');
+
+    // ── Engine instance ────────────────────────────────────────────────────
+    const engine = new Engine();
+    let currentWpm = 300;
+
+    engine.onToken = (t, idx, total) => {
+        beforeSpan.textContent = t.before;
+        orpSpan.textContent = t.orp;
+        afterSpan.textContent = t.after;
+        punctSpan.textContent = t.punct;
+        progressBadge.textContent = `${idx + 1}/${total}`;
+        progressBar.style.width = `${((idx + 1) / total) * 100}%`;
+    };
+
+    engine.onState = (s) => {
+        if (s === 'paused') {
+            stateBadge.textContent = 'PAUSED';
+            stateBadge.classList.add('visible');
+            setTimeout(() => stateBadge.classList.remove('visible'), 1500);
+        } else if (s === 'playing') {
+            stateBadge.textContent = 'PLAYING';
+            stateBadge.classList.add('visible');
+            setTimeout(() => stateBadge.classList.remove('visible'), 800);
+        } else if (s === 'done') {
+            stateBadge.textContent = 'DONE';
+            stateBadge.classList.add('visible');
+        }
+    };
+
+    engine.onDone = () => {
+        // stay on reader, user can press Esc or click back
+    };
+
+    // ── UI actions ─────────────────────────────────────────────────────────
+    function showReader() {
+        const text = textInput.value.trim();
+        if (!text) return;
+        currentWpm = parseInt(wpmSlider.value);
+        engine.load(text, currentWpm);
+        wpmBadge.textContent = `${currentWpm} WPM`;
+
+        inputScreen.style.display = 'none';
+        readerScreen.style.display = 'block';
+
+        // Clear previous word
+        beforeSpan.textContent = '';
+        orpSpan.textContent = '';
+        afterSpan.textContent = '';
+        punctSpan.textContent = '';
+        progressBar.style.width = '0%';
+
+        // small delay for visual transition
+        setTimeout(() => engine.play(), 200);
+    }
+
+    function showInput() {
+        engine.pause();
+        readerScreen.style.display = 'none';
+        inputScreen.style.display = 'flex';
+    }
+
+    function flashHint(text) {
+        gestureHint.textContent = text;
+        gestureHint.classList.add('show');
+        setTimeout(() => gestureHint.classList.remove('show'), 600);
+    }
+
+    // ── Event bindings ─────────────────────────────────────────────────────
+    startBtn.addEventListener('click', showReader);
+    backBtn.addEventListener('click', showInput);
+
+    wpmSlider.addEventListener('input', () => {
+        wpmVal.textContent = wpmSlider.value;
+    });
+
+    // Click on reader = toggle play/pause
+    readerScreen.addEventListener('click', (e) => {
+        if (e.target === backBtn || backBtn.contains(e.target)) return;
+        engine.toggle();
+    });
+
+    // Keyboard
+    document.addEventListener('keydown', (e) => {
+        // Only handle shortcuts when reader is visible
+        if (readerScreen.style.display !== 'block') {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                showReader();
+                e.preventDefault();
+            }
+            return;
+        }
+
+        switch (e.key) {
+            case ' ':
+                e.preventDefault();
+                engine.toggle();
+                break;
+            case 'ArrowLeft':
+                e.preventDefault();
+                engine.seek(-8);
+                flashHint('← −8');
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                engine.seek(8);
+                flashHint('→ +8');
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                currentWpm = Math.min(currentWpm + 25, 1200);
+                engine.setWpm(currentWpm);
+                wpmBadge.textContent = `${currentWpm} WPM`;
+                wpmSlider.value = currentWpm;
+                wpmVal.textContent = currentWpm;
+                flashHint(`↑ ${currentWpm} WPM`);
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                currentWpm = Math.max(currentWpm - 25, 60);
+                engine.setWpm(currentWpm);
+                wpmBadge.textContent = `${currentWpm} WPM`;
+                wpmSlider.value = currentWpm;
+                wpmVal.textContent = currentWpm;
+                flashHint(`↓ ${currentWpm} WPM`);
+                break;
+            case 'Escape':
+                showInput();
+                break;
+        }
+    });
+
+    // Platform tabs (cosmetic)
+    document.querySelectorAll('.platform-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+        });
+    });
+    </script>
+</body>
+</html>
