@@ -82,11 +82,28 @@ PHASE 5: DESKTOP — DONE
   ✅ desktop/CMakeLists.txt (19 lines) — Qt6 cmake config
   ✅ desktop/main.cpp — Qt Widgets app
 
+PHASE 6: WEB APP (VANILLA JS) — DONE
+─────────────────────────────────────────
+A complete, production-grade web version was built in `demo/` matching the spec exactly.
+Zero dependencies, vanilla JS/HTML/CSS.
+
+  ✅ demo/index.html (261 lines) — Structure for all screens (import, reader, settings, notes)
+  ✅ demo/style.css (1020 lines) — CSS design system (themes, focus modes, animations)
+  ✅ demo/engine.js (446 lines) — Faithful JS port of the C++ RSVP engine + chunking/analytics
+  ✅ demo/app.js (1193 lines) — App controller, gesture physics, storage, audio
+
+Features:
+- 3 reading modes (RSVP, Flow, Teleprompter)
+- 5 themes, 4 ORP colors, 3 focus modes
+- Gestures: Tap, double tap, triple tap, long press, horizontal scrub, vertical speed drag, pinch to zoom, diagonal swipe for notes
+- Web Audio API sound design (tick/ambient)
+- LocalStorage persistence (recent files, notes, preferences)
+
 ================================================================================
 WHAT STILL NEEDS TO BE CREATED
 ================================================================================
 
-None. All platform files are now in place.
+None. All platform files and the Web app are now in place.
 
 ================================================================================
 DESIGN SPEC REFERENCE (from AGENTS.md)

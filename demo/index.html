@@ -2,656 +2,260 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RSVP Reader — Interactive Demo</title>
-    <meta name="description" content="Interactive demo of the RSVP speed-reading engine">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RSVP — Speed Reading</title>
+    <meta name="description" content="A premium speed-reading tool. RSVP, Flow, and Teleprompter modes with adaptive timing, ORP highlighting, and cinematic design.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <style>
-        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-        :root {
-            --bg: #0a0a0a;
-            --word: #e8e4dc;
-            --orp: #c0392b;
-            --guide: rgba(255,255,255,0.06);
-            --badge: rgba(255,255,255,0.22);
-            --punct: rgba(255,255,255,0.40);
-            --input-bg: #111111;
-            --serif: 'EB Garamond', Georgia, 'Times New Roman', serif;
-            --mono: 'JetBrains Mono', 'Courier New', monospace;
-        }
-
-        body {
-            background: var(--bg);
-            color: var(--word);
-            font-family: var(--serif);
-            height: 100vh;
-            overflow: hidden;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        /* ── INPUT SCREEN ───────────────────────────────── */
-        #input-screen {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
-            padding: 32px;
-            gap: 20px;
-            animation: fadeIn 0.4s ease;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        #input-screen h1 {
-            font-family: var(--serif);
-            font-size: 2.4rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            background: linear-gradient(135deg, var(--word) 40%, var(--orp) 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .input-hint {
-            font-family: var(--mono);
-            font-size: 0.78rem;
-            color: var(--badge);
-            letter-spacing: 0.03em;
-        }
-
-        #text-input {
-            flex: 1;
-            background: var(--input-bg);
-            color: var(--word);
-            font-family: var(--serif);
-            font-size: 1.05rem;
-            line-height: 1.7;
-            border: 1px solid rgba(255,255,255,0.06);
-            padding: 20px;
-            resize: none;
-            caret-color: var(--orp);
-            transition: border-color 0.3s ease;
-        }
-        #text-input:focus {
-            outline: none;
-            border-color: rgba(192,57,43,0.4);
-        }
-        #text-input::placeholder {
-            color: rgba(255,255,255,0.15);
-        }
-
-        .controls-row {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        #start-btn {
-            background: var(--orp);
-            color: var(--word);
-            border: none;
-            font-family: var(--mono);
-            font-size: 0.95rem;
-            font-weight: 500;
-            padding: 12px 36px;
-            cursor: pointer;
-            letter-spacing: 0.1em;
-            transition: all 0.2s ease;
-            position: relative;
-            overflow: hidden;
-        }
-        #start-btn::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background: rgba(255,255,255,0);
-            transition: background 0.2s ease;
-        }
-        #start-btn:hover::after {
-            background: rgba(255,255,255,0.08);
-        }
-        #start-btn:active { transform: scale(0.97); }
-
-        .wpm-control {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-family: var(--mono);
-            font-size: 0.82rem;
-            color: var(--badge);
-        }
-        .wpm-control label { white-space: nowrap; }
-        #wpm-slider {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 140px;
-            height: 3px;
-            background: rgba(255,255,255,0.1);
-            outline: none;
-        }
-        #wpm-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 14px;
-            height: 14px;
-            background: var(--orp);
-            border-radius: 50%;
-            cursor: pointer;
-        }
-        #wpm-val {
-            min-width: 3.5em;
-            text-align: right;
-            color: var(--word);
-        }
-
-        .gesture-help {
-            font-family: var(--mono);
-            font-size: 0.7rem;
-            color: rgba(255,255,255,0.12);
-            line-height: 1.6;
-        }
-
-        /* ── READER SCREEN ──────────────────────────────── */
-        #reader-screen {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: var(--bg);
-            animation: fadeIn 0.3s ease;
-        }
-
-        /* crosshair */
-        .crosshair-v, .crosshair-h {
-            position: absolute;
-            background: var(--guide);
-        }
-        .crosshair-v {
-            left: 50%;
-            top: 0;
-            bottom: 0;
-            width: 1px;
-            transform: translateX(-0.5px);
-        }
-        .crosshair-h {
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            transform: translateY(-0.5px);
-        }
-
-        /* word display */
-        #word-display {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            white-space: nowrap;
-            font-family: var(--serif);
-            font-size: clamp(2.2rem, 6vw, 3.6rem);
-            line-height: 1;
-            pointer-events: none;
-            transition: opacity 0.06s ease;
-        }
-        #word-display .before { color: var(--word); }
-        #word-display .orp { color: var(--orp); font-weight: 700; }
-        #word-display .after { color: var(--word); }
-        #word-display .punct { color: var(--punct); }
-
-        /* orp tick marks */
-        .orp-tick-top, .orp-tick-bottom {
-            position: absolute;
-            left: 50%;
-            width: 1px;
-            height: 14px;
-            background: rgba(192,57,43,0.35);
-            transform: translateX(-0.5px);
-        }
-        .orp-tick-top { bottom: calc(50% + 28px); }
-        .orp-tick-bottom { top: calc(50% + 28px); }
-
-        /* badges */
-        .reader-badge {
-            position: absolute;
-            font-family: var(--mono);
-            font-size: 0.78rem;
-            color: var(--badge);
-            pointer-events: none;
-        }
-        #wpm-badge { bottom: 20px; right: 24px; }
-        #progress-badge { bottom: 20px; left: 24px; }
-        #state-badge {
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            font-size: 0.65rem;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            opacity: 0;
-            transition: opacity 0.4s ease;
-        }
-        #state-badge.visible { opacity: 1; }
-
-        /* progress bar */
-        #progress-bar {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            height: 2px;
-            background: var(--orp);
-            transition: width 0.15s ease;
-        }
-
-        /* gesture hint overlay */
-        #gesture-hint {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: var(--mono);
-            font-size: 1.1rem;
-            color: rgba(192,57,43,0.7);
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-        #gesture-hint.show { opacity: 1; }
-
-        /* back button */
-        #back-btn {
-            position: absolute;
-            top: 16px;
-            left: 16px;
-            background: none;
-            border: 1px solid rgba(255,255,255,0.08);
-            color: var(--badge);
-            font-family: var(--mono);
-            font-size: 0.72rem;
-            padding: 6px 14px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            z-index: 10;
-        }
-        #back-btn:hover {
-            border-color: rgba(192,57,43,0.4);
-            color: var(--word);
-        }
-
-        /* platform tabs */
-        .platform-tabs {
-            display: flex;
-            gap: 0;
-            margin-bottom: 4px;
-        }
-        .platform-tab {
-            font-family: var(--mono);
-            font-size: 0.68rem;
-            padding: 6px 16px;
-            color: var(--badge);
-            cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s ease;
-            letter-spacing: 0.08em;
-        }
-        .platform-tab:hover { color: var(--word); }
-        .platform-tab.active {
-            color: var(--orp);
-            border-bottom-color: var(--orp);
-        }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=IBM+Plex+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&family=Literata:ital,wght@0,400;0,500;0,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
-    <!-- INPUT SCREEN -->
-    <div id="input-screen">
-        <h1>RSVP Reader</h1>
-        <div class="platform-tabs">
-            <div class="platform-tab active" data-p="web">WEB DEMO</div>
-            <div class="platform-tab" data-p="android">ANDROID</div>
-            <div class="platform-tab" data-p="ios">iOS</div>
-            <div class="platform-tab" data-p="desktop">DESKTOP</div>
+<body data-theme="dark" data-orp="red" data-focus="guided" data-mode="rsvp">
+
+    <!-- ═══════════════════ IMPORT SCREEN ═══════════════════ -->
+    <div id="import-screen">
+        <div class="import-header">
+            <h1 id="app-title">RSVP</h1>
+            <p class="tagline">speed reading · flow · focus</p>
         </div>
-        <p class="input-hint">Paste or type your text, then tap START</p>
-        <textarea id="text-input" placeholder="Paste your text here...">Speed reading is the process of rapidly recognizing and absorbing phrases or sentences on a page all at once, rather than identifying individual words. The amount of information that we process seems to be growing by the day, whether it is emails, reports and websites at work, or social media, books and magazines at home. We likely feel that we could not possibly cope with this information, let alone needing to recall and respond to it. Speed reading is not just about reading fast. The most important thing is understanding the text at higher speeds. RSVP, or Rapid Serial Visual Presentation, is a technique that flashes words one at a time at a fixed point on the screen. By eliminating the need for eye movement across lines, RSVP can dramatically increase your reading speed. The red letter you see is called the Optimal Recognition Point, where your eye naturally focuses on each word.</textarea>
-        <div class="controls-row">
-            <button id="start-btn">▶ START</button>
-            <div class="wpm-control">
-                <label>WPM</label>
-                <input type="range" id="wpm-slider" min="60" max="1200" value="300" step="25">
-                <span id="wpm-val">300</span>
+
+        <div class="import-body">
+            <textarea id="text-input" spellcheck="false" placeholder="Paste or type your text here...">Speed reading is the process of rapidly recognizing and absorbing phrases or sentences on a page all at once, rather than identifying individual words.
+
+The amount of information we process seems to grow by the day, whether it is emails, reports and websites at work, or social media, books and magazines at home. We likely feel that we could not possibly cope with this information, let alone recall and respond to it.
+
+RSVP, or Rapid Serial Visual Presentation, is a technique that flashes words one at a time at a fixed point on the screen. By eliminating the need for eye movement across lines, RSVP can dramatically increase your reading speed while maintaining comprehension.
+
+The red letter you see is called the Optimal Recognition Point — where your eye naturally focuses on each word. This technique was pioneered by researchers studying how the brain processes written language, and has been refined into the elegant system you are about to experience.
+
+Reading is not merely decoding symbols. It is the act of thought itself moving through another mind's architecture. When the interface disappears, only the ideas remain.</textarea>
+
+            <div class="import-secondary">
+                <div id="drop-zone" class="drop-zone">
+                    <div class="drop-zone-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="12" y1="18" x2="12" y2="12"/>
+                            <line x1="9" y1="15" x2="12" y2="12"/>
+                            <line x1="15" y1="15" x2="12" y2="12"/>
+                        </svg>
+                    </div>
+                    <span class="drop-text">Drop file or <u>browse</u></span>
+                    <span class="drop-formats">PDF · TXT · EPUB · DOCX</span>
+                    <input type="file" id="file-input" accept=".txt,.pdf,.epub,.docx" hidden>
+                </div>
             </div>
         </div>
-        <div class="gesture-help">
-            CONTROLS — Click: play/pause · ←→ keys: skip ±8 words · ↑↓ keys: speed ±25 WPM · Esc: back
+
+        <div class="import-controls">
+            <div class="mode-tabs" id="mode-tabs">
+                <button class="mode-tab active" data-mode="rsvp">RSVP</button>
+                <button class="mode-tab" data-mode="flow">FLOW</button>
+                <button class="mode-tab" data-mode="teleprompter">TELEPROMPTER</button>
+            </div>
+
+            <div class="wpm-row">
+                <div class="wpm-control">
+                    <label for="wpm-slider">WPM</label>
+                    <input type="range" id="wpm-slider" min="60" max="1200" value="300" step="25">
+                    <span id="wpm-val">300</span>
+                </div>
+            </div>
+
+            <button id="start-btn">
+                <span class="btn-icon">▶</span>
+                <span class="btn-text">BEGIN</span>
+            </button>
+        </div>
+
+        <div class="import-footer">
+            <p class="gesture-help" id="gesture-help-desktop">
+                <kbd>Space</kbd> play/pause · <kbd>←</kbd><kbd>→</kbd> seek · <kbd>↑</kbd><kbd>↓</kbd> speed · <kbd>Esc</kbd> back · <kbd>F</kbd> fullscreen
+            </p>
+            <p class="gesture-help" id="gesture-help-mobile">
+                tap: play/pause · drag ↔: scrub · drag ↕: speed · long press: back
+            </p>
+        </div>
+
+        <div id="recent-section" class="recent-section hidden">
+            <h3 class="recent-title">Recent</h3>
+            <div id="recent-list" class="recent-list"></div>
         </div>
     </div>
 
-    <!-- READER SCREEN -->
-    <div id="reader-screen">
-        <div class="crosshair-v"></div>
-        <div class="crosshair-h"></div>
-        <div class="orp-tick-top"></div>
-        <div class="orp-tick-bottom"></div>
+    <!-- ═══════════════════ READER SCREEN ═══════════════════ -->
+    <div id="reader-screen" class="screen hidden" aria-live="polite">
+        <!-- Crosshair guides -->
+        <div class="crosshair-v" aria-hidden="true"></div>
+        <div class="crosshair-h" aria-hidden="true"></div>
+        <div class="orp-tick orp-tick-top" aria-hidden="true"></div>
+        <div class="orp-tick orp-tick-bottom" aria-hidden="true"></div>
 
-        <div id="word-display">
-            <span class="before"></span><span class="orp"></span><span class="after"></span><span class="punct"></span>
+        <!-- RSVP word display -->
+        <div id="word-container">
+            <div id="context-prev" class="context-word" aria-hidden="true"></div>
+            <div id="word-display" role="timer" aria-atomic="true">
+                <span class="before"></span><span class="orp"></span><span class="after"></span><span class="punct"></span>
+            </div>
+            <div id="context-next" class="context-word" aria-hidden="true"></div>
         </div>
 
-        <button id="back-btn">← ESC</button>
-        <div id="wpm-badge" class="reader-badge">300 WPM</div>
-        <div id="progress-badge" class="reader-badge">0/0</div>
-        <div id="state-badge" class="reader-badge">PAUSED</div>
-        <div id="progress-bar"></div>
-        <div id="gesture-hint"></div>
+        <!-- Flow mode display -->
+        <div id="flow-container" class="mode-container hidden">
+            <div id="flow-sentence" class="flow-sentence"></div>
+        </div>
+
+        <!-- Teleprompter mode display -->
+        <div id="teleprompter-container" class="mode-container hidden">
+            <div id="teleprompter-text" class="teleprompter-text"></div>
+            <div class="teleprompter-focus-line" aria-hidden="true"></div>
+        </div>
+
+        <!-- Top bar -->
+        <div class="reader-top-bar">
+            <button id="back-btn" class="reader-btn" aria-label="Back to input">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                <span>ESC</span>
+            </button>
+            <div id="state-badge" class="reader-badge state-badge" aria-live="assertive">READY</div>
+            <div class="reader-top-right">
+                <button id="notes-toggle" class="reader-btn" aria-label="Toggle notes">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </button>
+                <button id="settings-toggle" class="reader-btn" aria-label="Open settings">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom bar -->
+        <div class="reader-bottom-bar">
+            <div id="progress-badge" class="reader-badge">0 / 0</div>
+            <div id="mode-indicator" class="reader-badge mode-indicator">RSVP</div>
+            <div class="wpm-display">
+                <span id="wpm-badge" class="reader-badge">300 WPM</span>
+                <span id="speed-multiplier" class="reader-badge speed-mult hidden">×1.0</span>
+            </div>
+        </div>
+
+        <!-- Gesture hint overlay -->
+        <div id="gesture-hint" class="gesture-hint-overlay" aria-hidden="true"></div>
+
+        <!-- Progress hairline -->
+        <div id="progress-bar" class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
     </div>
 
-    <script>
-    // ── RSVP Engine (faithful JS port of core/rsvp_engine.hpp) ──────────────
-    const Engine = (() => {
-        function orpIndex(word) {
-            let len = 0, first = -1;
-            for (let i = 0; i < word.length; i++) {
-                if (/[a-zA-Z]/.test(word[i])) {
-                    if (first < 0) first = i;
-                    len++;
-                }
-            }
-            if (len === 0 || first < 0) return 0;
-            const pos = len <= 1 ? 0 : len <= 5 ? 1 : len <= 9 ? 2 : len <= 13 ? 3 : 4;
-            let count = 0;
-            for (let i = first; i < word.length; i++) {
-                if (/[a-zA-Z]/.test(word[i])) {
-                    if (count === pos) return i;
-                    count++;
-                }
-            }
-            return first;
-        }
+    <!-- ═══════════════════ SETTINGS DRAWER ═══════════════════ -->
+    <div id="settings-overlay" class="overlay hidden" aria-hidden="true"></div>
+    <div id="settings-drawer" class="drawer hidden" role="dialog" aria-label="Settings">
+        <div class="drawer-handle" aria-hidden="true"><div class="handle-bar"></div></div>
 
-        function wordDur(word, wpm, sentEnd) {
-            const base = 60000 / wpm;
-            let scale = 1;
-            if (word.length > 8) scale = 1.15;
-            if (word.length > 13) scale = 1.30;
-            for (let i = 1; i < word.length; i++) {
-                if (/\d/.test(word[i])) { scale *= 1.20; break; }
-                if (/[A-Z]/.test(word[i])) { scale *= 1.10; break; }
-            }
-            if (sentEnd) scale *= 1.60;
-            return Math.max(50, Math.min(2000, Math.round(base * scale)));
-        }
+        <div class="drawer-content">
+            <section class="settings-section">
+                <h3 class="section-title">Theme</h3>
+                <div class="pill-group" id="theme-options">
+                    <button class="pill active" data-theme="dark">Dark</button>
+                    <button class="pill" data-theme="amoled">AMOLED</button>
+                    <button class="pill" data-theme="sepia">Sepia</button>
+                    <button class="pill" data-theme="paper">Paper</button>
+                    <button class="pill" data-theme="graphite">Graphite</button>
+                </div>
+            </section>
 
-        function tokenise(text, wpm) {
-            const tokens = [];
-            const words = text.match(/\S+/g) || [];
-            for (const raw of words) {
-                let end = raw.length;
-                while (end > 0 && /[^\w]/.test(raw[end - 1])) end--;
-                let clean = raw.substring(0, end);
-                let trail = raw.substring(end);
-                if (!clean) clean = raw;
+            <section class="settings-section">
+                <h3 class="section-title">ORP Highlight</h3>
+                <div class="swatch-group" id="orp-options">
+                    <button class="swatch active" data-orp="red" style="--sw:#c0392b" aria-label="Red"></button>
+                    <button class="swatch" data-orp="amber" style="--sw:#d4a017" aria-label="Amber"></button>
+                    <button class="swatch" data-orp="cyan" style="--sw:#00b4d8" aria-label="Cyan"></button>
+                    <button class="swatch" data-orp="lime" style="--sw:#7cb518" aria-label="Lime"></button>
+                </div>
+            </section>
 
-                const sentEnd = trail && /[.!?;]/.test(trail[trail.length - 1]);
-                const oi = orpIndex(clean);
+            <section class="settings-section">
+                <h3 class="section-title">Focus Mode</h3>
+                <div class="pill-group" id="focus-options">
+                    <button class="pill" data-focus="zen">Zen</button>
+                    <button class="pill active" data-focus="guided">Guided</button>
+                    <button class="pill" data-focus="sentence">Sentence</button>
+                </div>
+            </section>
 
-                tokens.push({
-                    before: clean.substring(0, oi),
-                    orp: clean.substring(oi, oi + 1),
-                    after: oi + 1 < clean.length ? clean.substring(oi + 1) : '',
-                    punct: trail,
-                    dur_ms: wordDur(clean, wpm, sentEnd),
-                    sentence_end: sentEnd
-                });
-            }
-            return tokens;
-        }
+            <section class="settings-section">
+                <h3 class="section-title">Typography</h3>
+                <div class="select-row">
+                    <label for="font-select">Font</label>
+                    <select id="font-select">
+                        <option value="'EB Garamond', serif" selected>EB Garamond</option>
+                        <option value="'Inter', sans-serif">Inter</option>
+                        <option value="'Literata', serif">Literata</option>
+                        <option value="'IBM Plex Sans', sans-serif">IBM Plex Sans</option>
+                        <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                        <option value="'OpenDyslexic', sans-serif">OpenDyslexic</option>
+                    </select>
+                </div>
+                <div class="slider-row">
+                    <label for="font-size">Size</label>
+                    <input type="range" id="font-size" min="20" max="80" value="42">
+                    <span class="slider-val" id="font-size-val">42px</span>
+                </div>
+                <div class="slider-row">
+                    <label for="font-weight">Weight</label>
+                    <input type="range" id="font-weight" min="300" max="700" value="400" step="100">
+                    <span class="slider-val" id="font-weight-val">400</span>
+                </div>
+                <div class="slider-row">
+                    <label for="letter-spacing">Spacing</label>
+                    <input type="range" id="letter-spacing" min="-2" max="10" value="0" step="0.5">
+                    <span class="slider-val" id="letter-spacing-val">0px</span>
+                </div>
+                <div class="slider-row">
+                    <label for="context-opacity">Context</label>
+                    <input type="range" id="context-opacity" min="0" max="50" value="20">
+                    <span class="slider-val" id="context-opacity-val">0.20</span>
+                </div>
+            </section>
 
-        return class Engine {
-            constructor() {
-                this.tokens = [];
-                this.cur = 0;
-                this.wpm = 300;
-                this.state = 'idle'; // idle, playing, paused, done
-                this.timer = null;
-                this.onToken = null;
-                this.onState = null;
-                this.onDone = null;
-            }
+            <section class="settings-section">
+                <h3 class="section-title">Sound</h3>
+                <div class="pill-group" id="sound-options">
+                    <button class="pill active" data-sound="off">Off</button>
+                    <button class="pill" data-sound="tick">Tick</button>
+                    <button class="pill" data-sound="ambient">Ambient</button>
+                </div>
+            </section>
 
-            load(text, wpm = 300) {
-                this.stop();
-                this.wpm = wpm;
-                this.tokens = tokenise(text, wpm);
-                this.cur = 0;
-                this.state = 'idle';
-            }
+            <section class="settings-section">
+                <h3 class="section-title">Accessibility</h3>
+                <label class="toggle-row"><input type="checkbox" id="dyslexia-toggle"><span>Dyslexia-friendly font</span></label>
+                <label class="toggle-row"><input type="checkbox" id="reduce-motion-toggle"><span>Reduced motion</span></label>
+                <label class="toggle-row"><input type="checkbox" id="high-contrast-toggle"><span>High contrast</span></label>
+            </section>
+        </div>
+    </div>
 
-            play() {
-                if (!this.tokens.length) return;
-                if (this.state === 'playing') return;
-                if (this.state === 'done') this.cur = 0;
-                this.state = 'playing';
-                if (this.onState) this.onState('playing');
-                this._tick();
-            }
+    <!-- ═══════════════════ NOTES PANEL ═══════════════════ -->
+    <div id="notes-panel" class="panel hidden" role="complementary" aria-label="Notes">
+        <div class="panel-header">
+            <h2 class="panel-title">Notes</h2>
+            <div class="panel-actions">
+                <button id="notes-export" class="panel-btn" aria-label="Export notes">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </button>
+                <button id="notes-close" class="panel-btn" aria-label="Close notes">✕</button>
+            </div>
+        </div>
+        <div id="notes-list" class="notes-list">
+            <div class="notes-empty">No notes yet. Swipe ↘ during reading to capture a thought.</div>
+        </div>
+    </div>
 
-            pause() {
-                if (this.state !== 'playing') return;
-                this.state = 'paused';
-                clearTimeout(this.timer);
-                if (this.onState) this.onState('paused');
-            }
+    <!-- ═══════════════════ TOAST ═══════════════════ -->
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-            toggle() {
-                this.state === 'playing' ? this.pause() : this.play();
-            }
-
-            stop() {
-                clearTimeout(this.timer);
-                this.state = 'idle';
-            }
-
-            seek(delta) {
-                this.cur = Math.max(0, Math.min(this.tokens.length - 1, this.cur + delta));
-                if (this.state !== 'playing' && this.tokens.length) {
-                    const t = this.tokens[this.cur];
-                    if (this.onToken) this.onToken(t, this.cur, this.tokens.length);
-                }
-            }
-
-            setWpm(wpm) {
-                this.wpm = Math.max(60, Math.min(1200, wpm));
-                for (let i = this.cur; i < this.tokens.length; i++) {
-                    const t = this.tokens[i];
-                    const word = t.before + t.orp + t.after;
-                    t.dur_ms = wordDur(word, this.wpm, t.sentence_end);
-                }
-            }
-
-            progress() {
-                return this.tokens.length ? this.cur / this.tokens.length : 0;
-            }
-
-            _tick() {
-                if (this.state !== 'playing') return;
-                if (this.cur >= this.tokens.length) {
-                    this.state = 'done';
-                    if (this.onState) this.onState('done');
-                    if (this.onDone) this.onDone();
-                    return;
-                }
-                const t = this.tokens[this.cur];
-                if (this.onToken) this.onToken(t, this.cur, this.tokens.length);
-                this.timer = setTimeout(() => {
-                    this.cur++;
-                    this._tick();
-                }, t.dur_ms);
-            }
-        };
-    })();
-
-    // ── DOM refs ────────────────────────────────────────────────────────────
-    const inputScreen = document.getElementById('input-screen');
-    const readerScreen = document.getElementById('reader-screen');
-    const textInput = document.getElementById('text-input');
-    const startBtn = document.getElementById('start-btn');
-    const wpmSlider = document.getElementById('wpm-slider');
-    const wpmVal = document.getElementById('wpm-val');
-    const wordDisplay = document.getElementById('word-display');
-    const wpmBadge = document.getElementById('wpm-badge');
-    const progressBadge = document.getElementById('progress-badge');
-    const stateBadge = document.getElementById('state-badge');
-    const progressBar = document.getElementById('progress-bar');
-    const gestureHint = document.getElementById('gesture-hint');
-    const backBtn = document.getElementById('back-btn');
-
-    const beforeSpan = wordDisplay.querySelector('.before');
-    const orpSpan = wordDisplay.querySelector('.orp');
-    const afterSpan = wordDisplay.querySelector('.after');
-    const punctSpan = wordDisplay.querySelector('.punct');
-
-    // ── Engine instance ────────────────────────────────────────────────────
-    const engine = new Engine();
-    let currentWpm = 300;
-
-    engine.onToken = (t, idx, total) => {
-        beforeSpan.textContent = t.before;
-        orpSpan.textContent = t.orp;
-        afterSpan.textContent = t.after;
-        punctSpan.textContent = t.punct;
-        progressBadge.textContent = `${idx + 1}/${total}`;
-        progressBar.style.width = `${((idx + 1) / total) * 100}%`;
-    };
-
-    engine.onState = (s) => {
-        if (s === 'paused') {
-            stateBadge.textContent = 'PAUSED';
-            stateBadge.classList.add('visible');
-            setTimeout(() => stateBadge.classList.remove('visible'), 1500);
-        } else if (s === 'playing') {
-            stateBadge.textContent = 'PLAYING';
-            stateBadge.classList.add('visible');
-            setTimeout(() => stateBadge.classList.remove('visible'), 800);
-        } else if (s === 'done') {
-            stateBadge.textContent = 'DONE';
-            stateBadge.classList.add('visible');
-        }
-    };
-
-    engine.onDone = () => {
-        // stay on reader, user can press Esc or click back
-    };
-
-    // ── UI actions ─────────────────────────────────────────────────────────
-    function showReader() {
-        const text = textInput.value.trim();
-        if (!text) return;
-        currentWpm = parseInt(wpmSlider.value);
-        engine.load(text, currentWpm);
-        wpmBadge.textContent = `${currentWpm} WPM`;
-
-        inputScreen.style.display = 'none';
-        readerScreen.style.display = 'block';
-
-        // Clear previous word
-        beforeSpan.textContent = '';
-        orpSpan.textContent = '';
-        afterSpan.textContent = '';
-        punctSpan.textContent = '';
-        progressBar.style.width = '0%';
-
-        // small delay for visual transition
-        setTimeout(() => engine.play(), 200);
-    }
-
-    function showInput() {
-        engine.pause();
-        readerScreen.style.display = 'none';
-        inputScreen.style.display = 'flex';
-    }
-
-    function flashHint(text) {
-        gestureHint.textContent = text;
-        gestureHint.classList.add('show');
-        setTimeout(() => gestureHint.classList.remove('show'), 600);
-    }
-
-    // ── Event bindings ─────────────────────────────────────────────────────
-    startBtn.addEventListener('click', showReader);
-    backBtn.addEventListener('click', showInput);
-
-    wpmSlider.addEventListener('input', () => {
-        wpmVal.textContent = wpmSlider.value;
-    });
-
-    // Click on reader = toggle play/pause
-    readerScreen.addEventListener('click', (e) => {
-        if (e.target === backBtn || backBtn.contains(e.target)) return;
-        engine.toggle();
-    });
-
-    // Keyboard
-    document.addEventListener('keydown', (e) => {
-        // Only handle shortcuts when reader is visible
-        if (readerScreen.style.display !== 'block') {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-                showReader();
-                e.preventDefault();
-            }
-            return;
-        }
-
-        switch (e.key) {
-            case ' ':
-                e.preventDefault();
-                engine.toggle();
-                break;
-            case 'ArrowLeft':
-                e.preventDefault();
-                engine.seek(-8);
-                flashHint('← −8');
-                break;
-            case 'ArrowRight':
-                e.preventDefault();
-                engine.seek(8);
-                flashHint('→ +8');
-                break;
-            case 'ArrowUp':
-                e.preventDefault();
-                currentWpm = Math.min(currentWpm + 25, 1200);
-                engine.setWpm(currentWpm);
-                wpmBadge.textContent = `${currentWpm} WPM`;
-                wpmSlider.value = currentWpm;
-                wpmVal.textContent = currentWpm;
-                flashHint(`↑ ${currentWpm} WPM`);
-                break;
-            case 'ArrowDown':
-                e.preventDefault();
-                currentWpm = Math.max(currentWpm - 25, 60);
-                engine.setWpm(currentWpm);
-                wpmBadge.textContent = `${currentWpm} WPM`;
-                wpmSlider.value = currentWpm;
-                wpmVal.textContent = currentWpm;
-                flashHint(`↓ ${currentWpm} WPM`);
-                break;
-            case 'Escape':
-                showInput();
-                break;
-        }
-    });
-
-    // Platform tabs (cosmetic)
-    document.querySelectorAll('.platform-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-            document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
-            tab.classList.add('active');
-        });
-    });
-    </script>
+    <!-- ═══════════════════ SCRIPTS ═══════════════════ -->
+    <script src="engine.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
