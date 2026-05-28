@@ -1,0 +1,10 @@
+version: "3.8"
+
+services:
+  rsvp-web:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "6767:80"
+    volumes:
+      - ./web:/usr/share/nginx/html:ro

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RSVP Reader — Focused Speed Reading</title>
+    <meta
+      name="description"
+      content="A high-level RSVP Reader experience with focused typography, ORP highlighting, and deep customization."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="logo">RSVP</div>
+        <nav class="nav">
+          <a href="#experience">Experience</a>
+          <a href="#customize">Customize</a>
+          <a href="#platforms">Platforms</a>
+        </nav>
+        <button class="cta">Request Access</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Rapid Serial Visual Presentation</p>
+            <h1>Speed reading with a calm, precision-first interface.</h1>
+            <p class="lead">
+              RSVP Reader focuses your attention on the Optimal Recognition Point (ORP), keeping
+              comprehension high while you scale speed. Clean typography, guided focus, and deep
+              customization make it feel personal from the first word.
+            </p>
+            <div class="hero-actions">
+              <button class="cta">Launch Preview</button>
+              <button class="secondary">View Demo</button>
+            </div>
+            <div class="metrics">
+              <div>
+                <span class="metric-value">60–1200</span>
+                <span class="metric-label">WPM range</span>
+              </div>
+              <div>
+                <span class="metric-value">3 modes</span>
+                <span class="metric-label">RSVP, Flow, Teleprompter</span>
+              </div>
+              <div>
+                <span class="metric-value">Offline</span>
+                <span class="metric-label">Queue + focus sessions</span>
+              </div>
+            </div>
+          </div>
+          <div class="hero-preview">
+            <div class="preview-frame">
+              <div class="crosshair"></div>
+              <div class="word-preview" id="hero-word">
+                <span class="before">co</span><span class="orp">n</span
+                ><span class="after">cept</span>
+              </div>
+              <div class="preview-sub">Optimal Recognition Point highlighted in red.</div>
+            </div>
+            <div class="preview-controls">
+              <div class="badge">Focus: Guided</div>
+              <div class="badge">WPM: <span id="hero-wpm">320</span></div>
+              <div class="badge">Theme: Onyx</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="experience" class="section">
+        <div class="container">
+          <div class="section-header">
+            <h2>Designed for deep reading, not distractions.</h2>
+            <p>
+              Everything in the reader is stripped down to essentials: a single word, a single
+              focal point, and a pacing engine that respects punctuation and rhythm.
+            </p>
+          </div>
+          <div class="grid cards">
+            <div class="card">
+              <h3>Guided focus</h3>
+              <p>Crosshair guides keep your gaze anchored while context fades in and out.</p>
+            </div>
+            <div class="card">
+              <h3>Adaptive pacing</h3>
+              <p>Longer words, sentence breaks, and numbers get extra time automatically.</p>
+            </div>
+            <div class="card">
+              <h3>Audio sync</h3>
+              <p>Optional audio cues keep you locked in when the tempo gets intense.</p>
+            </div>
+            <div class="card">
+              <h3>Reading queue</h3>
+              <p>Save articles or notes and return to them offline with a single tap.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="customize" class="section customization">
+        <div class="container customization-grid">
+          <div class="customization-copy">
+            <h2>Heavy customization, light interface.</h2>
+            <p>
+              Tweak typography, ORP color, spacing, and ambient focus levels without leaving the
+              reader. The preview updates in real-time.
+            </p>
+            <div class="controls">
+              <label>
+                Preview word
+                <input id="word-input" type="text" value="clarity" maxlength="18" />
+              </label>
+              <label>
+                WPM
+                <input id="wpm-input" type="range" min="60" max="900" step="10" value="320" />
+                <span class="slider-value" id="wpm-value">320</span>
+              </label>
+              <label>
+                Font
+                <select id="font-input">
+                  <option value="'EB Garamond', serif" selected>EB Garamond</option>
+                  <option value="'Inter', sans-serif">Inter</option>
+                  <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                </select>
+              </label>
+              <label>
+                Size
+                <input id="size-input" type="range" min="36" max="96" value="64" />
+                <span class="slider-value" id="size-value">64</span>
+              </label>
+              <label>
+                Letter spacing
+                <input id="spacing-input" type="range" min="-2" max="8" step="0.5" value="0" />
+                <span class="slider-value" id="spacing-value">0</span>
+              </label>
+              <label>
+                ORP color
+                <input id="accent-input" type="color" value="#c0392b" />
+              </label>
+              <label>
+                Background
+                <input id="bg-input" type="color" value="#0a0a0a" />
+              </label>
+              <label>
+                Guide opacity
+                <input id="guide-input" type="range" min="0" max="20" value="6" />
+                <span class="slider-value" id="guide-value">6</span>
+              </label>
+            </div>
+          </div>
+          <div class="customization-preview">
+            <div class="preview-frame large" id="custom-preview">
+              <div class="crosshair"></div>
+              <div class="word-preview" id="custom-word">
+                <span class="before">cl</span><span class="orp">a</span
+                ><span class="after">rity</span>
+              </div>
+              <div class="preview-sub">Live customization preview.</div>
+            </div>
+            <div class="preview-stats">
+              <div class="stat">
+                <span class="stat-label">Mode</span>
+                <span class="stat-value">RSVP</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Focus</span>
+                <span class="stat-value">Guided</span>
+              </div>
+              <div class="stat">
+                <span class="stat-label">Theme</span>
+                <span class="stat-value">Custom</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="platforms" class="section">
+        <div class="container">
+          <div class="section-header">
+            <h2>One experience, every device.</h2>
+            <p>Android, iOS, and Desktop share the same reading engine and visual rhythm.</p>
+          </div>
+          <div class="grid platform-grid">
+            <div class="platform">
+              <span class="platform-title">Android</span>
+              <span class="platform-detail">Jetpack Compose + JNI</span>
+            </div>
+            <div class="platform">
+              <span class="platform-title">iOS</span>
+              <span class="platform-detail">SwiftUI + C++ interop</span>
+            </div>
+            <div class="platform">
+              <span class="platform-title">Desktop</span>
+              <span class="platform-detail">Qt 6 + C++17</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section cta-section">
+        <div class="container cta-inner">
+          <div>
+            <h2>Turn pages into momentum.</h2>
+            <p>Bring RSVP Reader to your team, your readers, or your own daily workflow.</p>
+          </div>
+          <button class="cta">Contact for hosting</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <span>RSVP Reader</span>
+        <span class="footer-muted">Precision reading, reimagined.</span>
+      </div>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
