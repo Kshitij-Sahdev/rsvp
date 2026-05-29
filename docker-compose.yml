@@ -1,10 +1,11 @@
-version: "3.8"
-
 services:
   rsvp-web:
-    image: nginx:alpine
+    build:
+      context: ./web
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "6767:80"
-    volumes:
-      - ./web:/usr/share/nginx/html:ro
+      - "6767:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
