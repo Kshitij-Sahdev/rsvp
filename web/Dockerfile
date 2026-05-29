@@ -20,7 +20,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
+
+# This repo currently has no `public/` directory. Copy it only if it exists.
+# (The build would otherwise fail with: "/app/public": not found)
+RUN mkdir -p ./public
 
 EXPOSE 3000
 
