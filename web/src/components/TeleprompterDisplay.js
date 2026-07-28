@@ -56,8 +56,8 @@ export default function TeleprompterDisplay({ token, index, engine, onBuild }) {
     const activeEl = textRef.current.querySelector('.tp-word.active');
     if (activeEl) {
       const container = containerRef.current;
-      // We want to position the active word about 35% from the top
-      const offset = activeEl.offsetTop - container.clientHeight * 0.35;
+      // Position the active word dead center vertically
+      const offset = activeEl.offsetTop - (container.clientHeight / 2) + (activeEl.clientHeight / 2);
       
       // Use CSS transform for hardware accelerated, sub-pixel smooth sliding
       textRef.current.style.transform = `translate3d(0, -${offset}px, 0)`;

@@ -229,30 +229,54 @@ export default function WorkspaceSidebar({
                   No notes saved yet.<br />Swipe ↘ or press <kbd>Shift + N</kbd> during reading to bookmark a word with its context.
                 </div>
               ) : (
-                notes.map((n) => (
-                  <div
-                    key={n.id}
-                    className="note-studio-card"
-                    onClick={() => onSeekToNote(n.wordIdx)}
-                  >
-                    <div className="note-studio-context" dangerouslySetInnerHTML={{
-                      __html: n.context.map(c =>
-                        c.isTarget
-                          ? `<span class="note-studio-highlight">${escHtml(c.word)}</span>`
-                          : escHtml(c.word)
-                      ).join(' ')
-                    }} />
-                    <div className="note-studio-meta">
-                      <span className="note-studio-time">{timeAgo(new Date(n.timestamp))}</span>
-                      <button
-                        className="note-studio-delete"
-                        onClick={(e) => { e.stopPropagation(); onDeleteNote(n.id); }}
-                      >
-                        ✕
-                      </button>
+                notes.map((n) => {
+                  const plainTextContext = n.context.map(c => c.word).join(' ');
+                  return (
+                    <div
+                      key={n.id}
+                      className="note-studio-card"
+                    >
+                      <div className="note-studio-context" dangerouslySetInnerHTML={{
+                        __html: n.context.map(c =>
+                          c.isTarget
+                            ? `<span class="note-studio-highlight">${escHtml(c.word)}</span>`
+                            : escHtml(c.word)
+                        ).join(' ')
+                      }} />
+                      <div className="note-studio-meta">
+                        <span className="note-studio-time">{timeAgo(new Date(n.timestamp))}</span>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <button
+                            className="btn-small"
+                            style={{ fontSize: '0.62rem', padding: '1px 6px', border: '1px solid var(--border)', borderRadius: '4px' }}
+                            onClick={() => onSeekToNote(n.wordIdx)}
+                            title="Jump reader to this exact point"
+                          >
+                            ↶ Jump
+                          </button>
+                          <button
+                            className="btn-small"
+                            style={{ fontSize: '0.62rem', padding: '1px 6px', border: '1px solid var(--border)', borderRadius: '4px' }}
+                            onClick={() => {
+                              navigator.clipboard.writeText(plainTextContext);
+                              if (window.__rsvpToast) window.__rsvpToast('📋 Copied to clipboard');
+                            }}
+                            title="Copy text snippet"
+                          >
+                            Copy
+                          </button>
+                          <button
+                            className="note-studio-delete"
+                            onClick={(e) => { e.stopPropagation(); onDeleteNote(n.id); }}
+                            title="Delete note"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>

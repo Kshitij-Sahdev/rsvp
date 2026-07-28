@@ -1,68 +1,66 @@
 'use client';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 
 function escHtml(s) {
   if (!s) return '';
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export default function FlowDisplay({ token, index, engine, reducedMotion }) {
-  const sentenceRef = useRef(null);
-  const currentSentenceRef = useRef(-1);
+export default function FlowDisplay({ token, index, engine }) {
+  const containerRef = useRef(null);
+  const textRef = useRef(null);
+  const builtRef = useRef(false);
+
+  const buildStream = useCallback(() => {
+    if (!engine || !textRef.current) return;
+    const total = engine.getTotal();
+    let html = '';
+    for (let i = 0; i < total; i++) {
+      const t = engine.getToken(i);
+      if (!t) continue;
+      html += `<span class="stream-word" data-idx="${i}">`;
+      html += escHtml(t.before);
+      html += `<span class="flow-orp">${escHtml(t.orp)}</span>`;
+      html += escHtml(t.after);
+      html += escHtml(t.punct);
+      html += '</span> ';
+    }
+    textRef.current.innerHTML = html;
+    builtRef.current = true;
+  }, [engine]);
 
   useEffect(() => {
-    if (!token || !engine || !sentenceRef.current) return;
-
-    const indices = engine.getSentenceIndices(index);
-    if (!indices) return;
-    const [sStart, sEnd] = indices;
-    const sentIdx = token.sentence_idx || 0;
-
-    // Rebuild sentence HTML if sentence changed
-    if (sentIdx !== currentSentenceRef.current) {
-      currentSentenceRef.current = sentIdx;
-      let html = '';
-      for (let i = sStart; i <= sEnd; i++) {
-        const wt = engine.getToken(i);
-        if (!wt) continue;
-        html += `<span class="flow-word" data-idx="${i}">`;
-        html += escHtml(wt.before);
-        html += `<span class="flow-orp">${escHtml(wt.orp)}</span>`;
-        html += escHtml(wt.after);
-        html += escHtml(wt.punct);
-        html += '</span> ';
-      }
-      sentenceRef.current.innerHTML = html;
-
-      // Cinematic drift in
-      if (!reducedMotion) {
-        sentenceRef.current.style.opacity = '0';
-        sentenceRef.current.style.transform = 'translateY(12px) scale(0.98)';
-        
-        // Double RAF to ensure styles are applied before transition begins
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (sentenceRef.current) {
-              sentenceRef.current.style.opacity = '1';
-              sentenceRef.current.style.transform = 'translateY(0) scale(1)';
-            }
-          });
-        });
-      }
+    if (engine && engine.getTotal() > 0 && !builtRef.current) {
+      buildStream();
     }
+  }, [engine, buildStream]);
 
-    // Highlight current word
-    sentenceRef.current.querySelectorAll('.flow-word').forEach(el => {
+  useEffect(() => {
+    return () => { builtRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!token || !textRef.current || !containerRef.current) return;
+
+    textRef.current.querySelectorAll('.stream-word').forEach(el => {
       const wi = parseInt(el.dataset.idx);
-      el.classList.toggle('current', wi === index);
+      el.classList.toggle('active', wi === index);
       el.classList.toggle('past', wi < index);
       el.classList.toggle('future', wi > index);
     });
-  }, [token, index, engine, reducedMotion]);
+
+    const activeEl = textRef.current.querySelector('.stream-word.active');
+    if (activeEl) {
+      const container = containerRef.current;
+      const offset = activeEl.offsetLeft - (container.clientWidth / 2) + (activeEl.clientWidth / 2);
+      textRef.current.style.transform = `translate3d(-${offset}px, 0, 0)`;
+    }
+  }, [token, index]);
 
   return (
-    <div className="mode-container">
-      <div className="flow-sentence" ref={sentenceRef} />
+    <div className="stream-container" ref={containerRef}>
+      <div className="stream-text" ref={textRef} />
     </div>
   );
 }
+
