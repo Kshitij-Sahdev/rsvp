@@ -14,10 +14,11 @@ export default function TeleprompterDisplay({ token, index, engine, onBuild }) {
   // Build teleprompter text
   const buildTeleprompter = useCallback(() => {
     if (!engine || !textRef.current) return;
-    const rawTokens = engine.getRawTokens();
+    const total = engine.getTotal();
     let html = '';
-    for (let i = 0; i < rawTokens.length; i++) {
-      const t = rawTokens[i];
+    for (let i = 0; i < total; i++) {
+      const t = engine.getToken(i);
+      if (!t) continue;
       html += `<span class="tp-word" data-idx="${i}">`;
       html += escHtml(t.word) + escHtml(t.punct);
       html += '</span> ';
@@ -43,13 +44,11 @@ export default function TeleprompterDisplay({ token, index, engine, onBuild }) {
   useEffect(() => {
     if (!token || !textRef.current || !containerRef.current) return;
 
-    const rawIdx = token._originalIndices ? token._originalIndices[0] : index;
-
     // Update word classes
     textRef.current.querySelectorAll('.tp-word').forEach(el => {
       const wi = parseInt(el.dataset.idx);
-      el.classList.toggle('active', wi === rawIdx);
-      el.classList.toggle('past', wi < rawIdx);
+      el.classList.toggle('active', wi === index);
+      el.classList.toggle('past', wi < index);
     });
 
     // Scroll to active word

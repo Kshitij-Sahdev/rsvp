@@ -13,17 +13,17 @@ export default function FlowDisplay({ token, index, engine, reducedMotion }) {
   useEffect(() => {
     if (!token || !engine || !sentenceRef.current) return;
 
-    const rawTokens = engine.getRawTokens();
-    const rawIdx = token._originalIndices ? token._originalIndices[0] : index;
-    const [sStart, sEnd] = engine.getSentenceIndices(rawIdx);
-    const sentIdx = rawTokens[rawIdx] ? rawTokens[rawIdx].sentence_idx : 0;
+    const indices = engine.getSentenceIndices(index);
+    if (!indices) return;
+    const [sStart, sEnd] = indices;
+    const sentIdx = token.sentence_idx || 0;
 
     // Rebuild sentence HTML if sentence changed
     if (sentIdx !== currentSentenceRef.current) {
       currentSentenceRef.current = sentIdx;
       let html = '';
       for (let i = sStart; i <= sEnd; i++) {
-        const wt = rawTokens[i];
+        const wt = engine.getToken(i);
         if (!wt) continue;
         html += `<span class="flow-word" data-idx="${i}">`;
         html += escHtml(wt.before);
@@ -46,9 +46,9 @@ export default function FlowDisplay({ token, index, engine, reducedMotion }) {
     // Highlight current word
     sentenceRef.current.querySelectorAll('.flow-word').forEach(el => {
       const wi = parseInt(el.dataset.idx);
-      el.classList.toggle('current', wi === rawIdx);
-      el.classList.toggle('past', wi < rawIdx);
-      el.classList.toggle('future', wi > rawIdx);
+      el.classList.toggle('current', wi === index);
+      el.classList.toggle('past', wi < index);
+      el.classList.toggle('future', wi > index);
     });
   }, [token, index, engine, reducedMotion]);
 
