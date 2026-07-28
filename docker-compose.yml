@@ -1,11 +1,13 @@
+version: "3.8"
+
 services:
   rsvp-web:
     build:
       context: ./web
       dockerfile: Dockerfile
-    restart: unless-stopped
+    restart: always
     ports:
-      - "6767:3000"
+      - "3000"
     environment:
-      - NODE_ENV=production
-      - NEXT_TELEMETRY_DISABLED=1
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: "1"
