@@ -49,14 +49,18 @@ export default function TeleprompterDisplay({ token, index, engine, onBuild }) {
       const wi = parseInt(el.dataset.idx);
       el.classList.toggle('active', wi === index);
       el.classList.toggle('past', wi < index);
+      el.classList.toggle('future', wi > index);
     });
 
-    // Scroll to active word
+    // Sub-pixel smooth scroll via CSS transform
     const activeEl = textRef.current.querySelector('.tp-word.active');
     if (activeEl) {
       const container = containerRef.current;
-      const targetScroll = activeEl.offsetTop - container.clientHeight * 0.35;
-      container.scrollTo({ top: targetScroll, behavior: 'smooth' });
+      // We want to position the active word about 35% from the top
+      const offset = activeEl.offsetTop - container.clientHeight * 0.35;
+      
+      // Use CSS transform for hardware accelerated, sub-pixel smooth sliding
+      textRef.current.style.transform = `translate3d(0, -${offset}px, 0)`;
     }
   }, [token, index]);
 

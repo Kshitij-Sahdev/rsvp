@@ -34,11 +34,19 @@ export default function FlowDisplay({ token, index, engine, reducedMotion }) {
       }
       sentenceRef.current.innerHTML = html;
 
-      // Fade in
+      // Cinematic drift in
       if (!reducedMotion) {
         sentenceRef.current.style.opacity = '0';
+        sentenceRef.current.style.transform = 'translateY(12px) scale(0.98)';
+        
+        // Double RAF to ensure styles are applied before transition begins
         requestAnimationFrame(() => {
-          if (sentenceRef.current) sentenceRef.current.style.opacity = '1';
+          requestAnimationFrame(() => {
+            if (sentenceRef.current) {
+              sentenceRef.current.style.opacity = '1';
+              sentenceRef.current.style.transform = 'translateY(0) scale(1)';
+            }
+          });
         });
       }
     }
