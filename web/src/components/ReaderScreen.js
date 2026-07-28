@@ -3,30 +3,50 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import RSVPDisplay from './RSVPDisplay';
 import FlowDisplay from './FlowDisplay';
 import TeleprompterDisplay from './TeleprompterDisplay';
-import SettingsDrawer from './SettingsDrawer';
-import NotesPanel from './NotesPanel';
 import ProgressBar from './ProgressBar';
 import WpmBadge from './WpmBadge';
 import GestureHint, { flashHint } from './GestureHint';
 import { showToast } from './Toast';
 import useGestures from '@/hooks/useGestures';
-import { GESTURES, FOCUS_MODES } from '@/lib/constants';
+import { GESTURES, FOCUS_MODES, READING_MODES, WPM_RANGE } from '@/lib/constants';
 
-export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, setPref, notes, addNote, deleteNote, exportNotes, onBack }) {
-  const [token, setToken] = useState(null);
-  const [index, setIndex] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [state, setState] = useState('idle');
-  const [wpm, setWpm] = useState(initialWpm || 300);
-  const [mode, setMode] = useState(initialMode || 'rsvp');
+export default function ReaderScreen({
+  engine,
+  wpm,
+  setWpm,
+  mode,
+  setMode,
+  token,
+  setToken,
+  index,
+  setIndex,
+  total,
+  setTotal,
+  state,
+  setState,
+  prefs,
+  setPref,
+  notes,
+  addNote,
+  deleteNote,
+  exportNotes,
+  activeTab,
+  setActiveTab,
+  zenMode,
+  setZenMode,
+}) {
   const [multiplier, setMultiplier] = useState(1.0);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showNotes, setShowNotes] = useState(false);
   const [stateVisible, setStateVisible] = useState(false);
+  const [wpmInput, setWpmInput] = useState(String(wpm));
 
   const readerRef = useRef(null);
   const stateTimerRef = useRef(null);
   const teleBuilderRef = useRef(null);
+
+  // Sync wpmInput with wpm
+  useEffect(() => {
+    setWpmInput(String(wpm));
+  }, [wpm]);
 
   // Set up engine callbacks
   useEffect(() => {
@@ -48,7 +68,7 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
 
     engine.onDone = () => {
       const a = engine.getAnalytics();
-      showToast(`Done! ${a.words_read} words in ${a.duration_sec}s · ${a.wpm_actual} WPM actual`);
+      showToast(`Done! ${a.wordsRead} words in ${a.elapsedSec}s · ${a.effectiveWpm} WPM`);
     };
 
     return () => {
@@ -57,29 +77,14 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
       engine.onDone = null;
       clearTimeout(stateTimerRef.current);
     };
-  }, [engine]);
+  }, [engine, setToken, setIndex, setTotal, setState]);
 
-  // Play on mount
-  useEffect(() => {
-    if (engine) {
-      setTotal(engine.getTotal());
-      setTimeout(() => engine.play(), 250);
-    }
-    return () => { if (engine) engine.pause(); };
-  }, [engine]);
-
-  // Teleprompter build
+  // Re-build teleprompter when mode switches
   useEffect(() => {
     if (mode === 'teleprompter' && teleBuilderRef.current) {
       teleBuilderRef.current();
     }
   }, [mode]);
-
-  // Mode change
-  const handleSetMode = useCallback((m) => {
-    setMode(m);
-    if (setPref) setPref('mode', m);
-  }, [setPref]);
 
   // Capture note
   const captureNote = useCallback(() => {
@@ -107,7 +112,7 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
     showToast('📌 Note captured');
   }, [engine, addNote]);
 
-  // Focus mode cycling
+  // Focus mode cycle
   const cycleFocusMode = useCallback(() => {
     const current = prefs?.focus || 'guided';
     const idx = FOCUS_MODES.indexOf(current);
@@ -125,7 +130,39 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
     }
   }, []);
 
-  // Gesture handlers
+  // Update speed safely
+  const updateWpm = useCallback((val) => {
+    const numeric = Math.max(60, Math.min(1200, Math.round(Number(val))));
+    setWpm(numeric);
+    if (engine) engine.setWpm(numeric);
+    if (setPref) setPref('wpm', numeric);
+  }, [engine, setWpm, setPref]);
+
+  const handleWpmInputChange = (e) => {
+    setWpmInput(e.target.value);
+  };
+
+  const handleWpmInputBlur = () => {
+    updateWpm(wpmInput);
+  };
+
+  const handleWpmInputKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      updateWpm(wpmInput);
+      e.target.blur();
+    }
+  };
+
+  // Progress scrubbing slider handler
+  const handleScrubChange = (e) => {
+    if (!engine) return;
+    const targetIdx = Number(e.target.value);
+    const delta = targetIdx - engine.getCur();
+    engine.seek(delta);
+  };
+
+  // Gesture bindings matching hooks/useGestures.js callbacks
   const gestureHandlers = {
     onTap: () => { if (engine) engine.toggle(); },
     onDoubleTap: () => {
@@ -137,10 +174,17 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
       }
     },
     onTripleTap: cycleFocusMode,
-    onLongPress: onBack,
+    onLongPress: () => {
+      if (engine) {
+        engine.seek(-engine.getCur()); // Restart text
+        flashHint('↩ Restarted');
+        showToast('Restarted text');
+      }
+    },
     onHorizontalDrag: (dx) => {
       if (!engine) return;
-      const wordsPerPixel = engine.getTotal() / (readerRef.current?.clientWidth || 800);
+      const width = readerRef.current?.clientWidth || 800;
+      const wordsPerPixel = engine.getTotal() / width;
       const seekDelta = Math.round(dx * wordsPerPixel * 0.3);
       if (Math.abs(seekDelta) >= 1) {
         engine.seek(seekDelta);
@@ -160,7 +204,6 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
         engine.resetSpeedMultiplier();
         setTimeout(() => setMultiplier(1.0), 400);
       } else if (axis === 'horizontal' && engine) {
-        // Momentum
         let v = velocity * 80;
         const friction = 0.92;
         const applyMomentum = () => {
@@ -179,57 +222,62 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
       const newSize = Math.max(20, Math.min(80, Math.round(prefs.fontSize * scale)));
       setPref('fontSize', newSize);
     },
-    // Keyboard handlers
-    onKeySpace: () => { if (engine) engine.toggle(); },
-    onKeyLeft: () => {
-      if (engine) { engine.seek(-GESTURES.SEEK_DELTA); flashHint('← −' + GESTURES.SEEK_DELTA); }
-    },
-    onKeyRight: () => {
-      if (engine) { engine.seek(GESTURES.SEEK_DELTA); flashHint('→ +' + GESTURES.SEEK_DELTA); }
-    },
-    onKeyUp: () => {
+    
+    // Keyboard handlers (called inside useGestures.js)
+    onSeek: (delta) => {
       if (engine) {
-        const newWpm = Math.min(1200, wpm + GESTURES.SPEED_DELTA);
-        setWpm(newWpm);
-        engine.setWpm(newWpm);
-        flashHint('↑ ' + newWpm + ' WPM');
+        engine.seek(delta);
+        flashHint((delta >= 0 ? '→ +' : '← ') + Math.abs(delta));
       }
     },
-    onKeyDown: () => {
+    onSpeedChange: (delta) => {
       if (engine) {
-        const newWpm = Math.max(60, wpm - GESTURES.SPEED_DELTA);
-        setWpm(newWpm);
-        engine.setWpm(newWpm);
-        flashHint('↓ ' + newWpm + ' WPM');
+        const nextWpm = Math.max(60, Math.min(1200, wpm + delta));
+        updateWpm(nextWpm);
+        flashHint((delta >= 0 ? '↑ ' : '↓ ') + nextWpm + ' WPM');
       }
     },
-    onKeyEscape: () => {
-      if (showSettings) setShowSettings(false);
-      else if (showNotes) setShowNotes(false);
-      else onBack();
+    onBack: () => {
+      // Toggle Zen Mode on ESC
+      setZenMode(v => !v);
+      flashHint(zenMode ? 'Dashboard Mode' : 'Zen Focus Mode');
     },
-    onKeyF: toggleFullscreen,
-    onKey1: () => { handleSetMode('rsvp'); flashHint('RSVP'); },
-    onKey2: () => { handleSetMode('flow'); flashHint('FLOW'); },
-    onKey3: () => { handleSetMode('teleprompter'); flashHint('TELEPROMPTER'); },
-    onKeyM: cycleFocusMode,
-    onKeyN: () => setShowNotes(v => !v),
-    onKeyS: () => setShowSettings(v => !v),
+    onFullscreen: toggleFullscreen,
+    onModeSwitch: (modeIdx) => {
+      const modes = ['rsvp', 'flow', 'teleprompter'];
+      const targetMode = modes[modeIdx];
+      if (targetMode) {
+        setMode(targetMode);
+        if (setPref) setPref('mode', targetMode);
+        flashHint(targetMode.toUpperCase());
+      }
+    },
+    onCycleFocus: cycleFocusMode,
+    onToggleNotes: () => {
+      setZenMode(false);
+      setActiveTab('notes');
+      flashHint('Notes panel opened');
+    },
+    onToggleSettings: () => {
+      setZenMode(false);
+      setActiveTab('adjust');
+      flashHint('Settings panel opened');
+    }
   };
 
   useGestures(readerRef, gestureHandlers, { enabled: true, keyboard: true });
 
-  const progress = total > 0 ? (index + 1) / total : 0;
+  const progress = total > 0 ? index / (total - 1 || 1) : 0;
 
   return (
-    <div className="reader-screen" ref={readerRef} aria-live="polite">
-      {/* Crosshair guides */}
+    <div className="studio-canvas" ref={readerRef} aria-live="polite">
+      {/* Cinematic Grid Guides */}
       <div className="crosshair-v" aria-hidden="true" />
       <div className="crosshair-h" aria-hidden="true" />
       <div className="orp-tick orp-tick-top" aria-hidden="true" />
       <div className="orp-tick orp-tick-bottom" aria-hidden="true" />
 
-      {/* RSVP Mode */}
+      {/* active reading display modes */}
       {mode === 'rsvp' && (
         <RSVPDisplay
           token={token}
@@ -240,7 +288,6 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
         />
       )}
 
-      {/* Flow Mode */}
       {mode === 'flow' && (
         <FlowDisplay
           token={token}
@@ -250,7 +297,6 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
         />
       )}
 
-      {/* Teleprompter Mode */}
       {mode === 'teleprompter' && (
         <TeleprompterDisplay
           token={token}
@@ -260,73 +306,204 @@ export default function ReaderScreen({ engine, initialWpm, initialMode, prefs, s
         />
       )}
 
-      {/* Top bar */}
-      <div className="reader-top-bar">
-        <button className="reader-btn" aria-label="Back to input" onClick={onBack}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <line x1="19" y1="12" x2="5" y2="12"/>
-            <polyline points="12 19 5 12 12 5"/>
-          </svg>
-          <span>ESC</span>
-        </button>
-        <div className={`state-badge ${stateVisible ? 'visible' : ''}`} aria-live="assertive">
-          {state.toUpperCase()}
-        </div>
-        <div className="reader-top-right">
-          <button className="reader-btn" aria-label="Toggle notes" onClick={() => setShowNotes(v => !v)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-              <polyline points="14 2 14 8 20 8"/>
-              <line x1="16" y1="13" x2="8" y2="13"/>
-              <line x1="16" y1="17" x2="8" y2="17"/>
+      {/* Top Floating Controls */}
+      <div className="canvas-top-bar">
+        <div className="canvas-top-left">
+          <button
+            className="reader-btn"
+            onClick={() => setZenMode(v => !v)}
+            title={zenMode ? 'Show Sidebar' : 'Zen Focus Mode (Hide Sidebar)'}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {zenMode ? (
+                <>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                  <polyline points="14 10 12 12 14 14" />
+                </>
+              ) : (
+                <>
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="9" y1="3" x2="9" y2="21" />
+                  <polyline points="12 10 14 12 12 14" />
+                </>
+              )}
             </svg>
+            <span>{zenMode ? 'STUDIO' : 'ZEN'}</span>
           </button>
-          <button className="reader-btn" aria-label="Open settings" onClick={() => setShowSettings(v => !v)}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          <div className="badge-state">{state.toUpperCase()}</div>
+        </div>
+
+        {/* Display modes switch inside reader overlay */}
+        <div className="canvas-top-right">
+          <div className="speed-preset-pills" style={{ marginRight: '6px' }}>
+            {READING_MODES.map(m => (
+              <button
+                key={m}
+                className={`preset-pill ${mode === m ? 'active' : ''}`}
+                onClick={() => {
+                  setMode(m);
+                  if (setPref) setPref('mode', m);
+                }}
+              >
+                {m.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <button className="reader-btn" onClick={toggleFullscreen} title="Toggle Fullscreen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
             </svg>
           </button>
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div className="reader-bottom-bar">
-        <div className="reader-badge">{index + 1} / {total}</div>
-        <div className="reader-badge mode-indicator">{mode.toUpperCase()}</div>
-        <WpmBadge wpm={wpm} multiplier={multiplier} />
-      </div>
-
-      {/* Gesture hint */}
+      {/* Gestures hint text flashes */}
       <GestureHint />
 
-      {/* Progress bar */}
-      <ProgressBar progress={progress} />
+      {/* Bottom Floating Control Panel */}
+      <div className="canvas-bottom-bar">
+        {/* Scrubbing slider */}
+        <div className="scrub-bar-container">
+          <input
+            type="range"
+            className="scrub-slider"
+            min={0}
+            max={total > 0 ? total - 1 : 0}
+            value={index}
+            onChange={handleScrubChange}
+            title="Drag or click to seek words"
+          />
+          <span className="progress-timestamp">
+            {index + 1} / {total}
+          </span>
+        </div>
 
-      {/* Settings Drawer */}
-      {showSettings && (
-        <SettingsDrawer
-          prefs={prefs}
-          setPref={setPref}
-          onClose={() => setShowSettings(false)}
-        />
-      )}
+        {/* Playback Controls Row */}
+        <div className="controls-main-row">
+          {/* Main buttons: Seek back, play/pause, seek forward, restart */}
+          <div className="playback-controls">
+            <button
+              className="playback-btn"
+              onClick={() => { if (engine) engine.seek(-1); }}
+              title="Previous Word"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="19 20 9 12 19 4 19 20" />
+                <line x1="5" y1="19" x2="5" y2="5" />
+              </svg>
+            </button>
 
-      {/* Notes Panel */}
-      {showNotes && (
-        <NotesPanel
-          notes={notes}
-          onDeleteNote={deleteNote}
-          onExportNotes={exportNotes}
-          onSeekToNote={(idx) => {
-            if (engine) {
-              engine.seek(idx - engine.getCur());
-              setShowNotes(false);
-            }
-          }}
-          onClose={() => setShowNotes(false)}
-        />
-      )}
+            <button
+              className="playback-btn"
+              onClick={() => { if (engine) engine.seek(-GESTURES.SEEK_DELTA); }}
+              title={`Rewind ${GESTURES.SEEK_DELTA} words`}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="11 19 2 12 11 5 11 19" />
+                <polygon points="22 19 13 12 22 5 22 19" />
+              </svg>
+            </button>
+
+            <button
+              className="play-btn-circle"
+              onClick={() => { if (engine) engine.toggle(); }}
+              title="Spacebar (Play/Pause)"
+            >
+              {state === 'playing' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="5" height="16" />
+                  <rect x="15" y="4" width="5" height="16" />
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+              )}
+            </button>
+
+            <button
+              className="playback-btn"
+              onClick={() => { if (engine) engine.seek(GESTURES.SEEK_DELTA); }}
+              title={`Forward ${GESTURES.SEEK_DELTA} words`}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="13 19 22 12 13 5 13 19" />
+                <polygon points="2 19 11 12 2 5 2 19" />
+              </svg>
+            </button>
+
+            <button
+              className="playback-btn"
+              onClick={() => { if (engine) engine.seek(1); }}
+              title="Next Word"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="5 4 15 12 5 20 5 4" />
+                <line x1="19" y1="5" x2="19" y2="19" />
+              </svg>
+            </button>
+
+            <button
+              className="playback-btn"
+              style={{ marginLeft: '6px' }}
+              onClick={() => { if (engine) engine.seek(-engine.getCur()); }}
+              title="Restart reading"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Speed Presets & Precise WPM editor */}
+          <div className="speed-controls-group">
+            {/* Speed preset pills */}
+            <div className="speed-preset-pills">
+              {[200, 350, 500, 700].map(val => (
+                <button
+                  key={val}
+                  className={`preset-pill ${wpm === val ? 'active' : ''}`}
+                  onClick={() => updateWpm(val)}
+                  title={`Set speed to ${val} WPM`}
+                >
+                  {val}
+                </button>
+              ))}
+            </div>
+
+            {/* Slider and direct input */}
+            <div className="wpm-adjuster-row">
+              <label htmlFor="canvas-wpm-slider">SPEED</label>
+              <input
+                type="range"
+                id="canvas-wpm-slider"
+                className="wpm-slider-small"
+                min={WPM_RANGE.min}
+                max={WPM_RANGE.max}
+                step={WPM_RANGE.step}
+                value={wpm}
+                onChange={(e) => updateWpm(Number(e.target.value))}
+              />
+              <input
+                type="text"
+                className="wpm-text-input"
+                value={wpmInput}
+                onChange={handleWpmInputChange}
+                onBlur={handleWpmInputBlur}
+                onKeyDown={handleWpmInputKeyDown}
+                title="Type a precise WPM speed and press Enter"
+              />
+              <span>WPM</span>
+            </div>
+
+            {/* Badge details */}
+            <div className="badge-row">
+              <WpmBadge wpm={wpm} multiplier={multiplier} />
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
